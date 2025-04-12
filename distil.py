@@ -2,6 +2,7 @@ import random
 import copy
 import logging
 import torch
+import os
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -81,7 +82,6 @@ class BatchNormActivationHook():
     def remove(self):
         self.handle.remove()
 
-
 def initialize_generator():
     generator = Generator().cuda()
     z = torch.randn(batch_size, latent_dim, device='cuda', requires_grad=True)
@@ -112,8 +112,17 @@ def compute_loss(x, bn_stats, hooks):
 
     return mean_loss, std_loss
 
-def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g, hooks, bn_stats):
-    for iteration in range(iters):
+def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g, hooks, bn_stats, checkpoint_path, load_checkpoint=False, iters=1000):
+    start_iteration = 0
+    if load_checkpoint and checkpoint_path and os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        generator.load_state_dict(checkpoint['generator_state_dict'])
+        opt_z.load_state_dict(checkpoint['opt_z_state_dict'])
+        opt_g.load_state_dict(checkpoint['opt_g_state_dict'])
+        start_iteration = checkpoint['iteration'] + 1
+        log.info(f"Loaded checkpoint from {checkpoint_path}, resuming at iteration {start_iteration}")
+
+    for iteration in range(start_iteration, iters):
         model.zero_grad()
         opt_z.zero_grad()
         opt_g.zero_grad()
@@ -133,13 +142,23 @@ def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
             log.info(f'{iteration + 1}/{iters}, Loss: {total_loss:.3f}, Mean: {mean_loss:.3f}, Std: {std_loss:.3f}')
             scheduler_g.step()
 
+        if (iteration + 1) % 100 == 0 and checkpoint_path:
+            torch.save({
+                'generator_state_dict': generator.state_dict(),
+                'opt_z_state_dict': opt_z.state_dict(),
+                'opt_g_state_dict': opt_g.state_dict(),
+                'iteration': iteration,
+            }, checkpoint_path)
+            log.info(f"Checkpoint saved at iteration {iteration + 1}")
+
     return x
 
-def distill_data(model):
+def distill_data(model, load_dataset_checkpoint=False, dataset_checkpoint_path='dataset_checkpoint.pt'):
     model = copy.deepcopy(model).cuda().eval()
     dataset = []
     hooks = []
     bn_stats = []
+
     for name, module in model.named_modules():
         if isinstance(module, nn.Conv2d) and module.stride != (1, 1):
             *parent_names, submodule_name = name.split('.')
@@ -147,20 +166,43 @@ def distill_data(model):
             for parent_name in parent_names:
                 parent = getattr(parent, parent_name)
             setattr(parent, submodule_name, SwingConv2d(module))
-        
         elif isinstance(module, nn.BatchNorm2d):
             hooks.append(BatchNormActivationHook(module))
             bn_stats.append((module.running_mean.detach().clone().cuda(),
-                            torch.sqrt(module.running_var + eps).detach().clone().cuda()))
-    
-    for i in range(1024 // batch_size):
+                             torch.sqrt(module.running_var + eps).detach().clone().cuda()))
+
+    # Check if we need to load an existing dataset checkpoint
+    current_index = 0
+    if load_dataset_checkpoint and os.path.exists(dataset_checkpoint_path):
+        checkpoint_data = torch.load(dataset_checkpoint_path)
+        dataset = checkpoint_data['dataset']
+        current_index = checkpoint_data['current_index']
+        log.info(f"Loaded dataset checkpoint from {dataset_checkpoint_path} with current index {current_index}")
+
+    # Assume total_samples and batch_size are defined elsewhere.
+    total_batches = total_samples // batch_size
+
+    for i in range(current_index, total_batches):
         log.info(f'Generate Image ({i * batch_size}/{total_samples})')
-
+        
+        # Get new generator and its training components
+        checkpoint_path = f'checkpoint_generator_i{i}.pt'
         generator, z, opt_z, opt_g, scheduler_z, scheduler_g = initialize_generator()
-        x = train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g, hooks, bn_stats)
 
+        # Load from generator checkpoint if available as needed:
+        x = train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
+                            hooks, bn_stats, checkpoint_path, load_checkpoint=True)
+        
         dataset.append(x.detach().clone())
 
+        # Save dataset checkpoint after each batch
+        torch.save({
+            'dataset': dataset,
+            'current_index': i + 1,  # increment index for next batch
+        }, dataset_checkpoint_path)
+        log.info(f"Dataset checkpoint saved at index {i + 1}")
+
+    # Remove hooks after processing
     for hook in hooks:
         hook.remove()
 
