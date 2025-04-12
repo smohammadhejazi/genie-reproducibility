@@ -1,4 +1,5 @@
 import torch
+import json
 import sys
 import argparse
 import torchvision.models as models
@@ -9,13 +10,17 @@ from quantize import quantize_model
 
 def main():
 
-    sys.argv = ["main.py", "resnet18", "-d", "-q"]
+    sys.argv = ["main.py", "resnet18", "-d"]
+
+    # with open("config.json", "r") as f:
+    #     config = json.load(f)
+
     
     prog = "Genie Reproducibility Challenge"
     descr = "Distill data and quantize models"
     parser = argparse.ArgumentParser(prog=prog, description=descr)
-    parser.add_argument("-d", "--distill", required=True, action="store_true", help="Distill images")
-    parser.add_argument("-q", "--quantize", required=True, action="store_true", help="Quantize model")
+    parser.add_argument("-d", "--distill", action="store_true", help="Distill images")
+    parser.add_argument("-q", "--quantize", action="store_true", help="Quantize model")
     parser.add_argument("model", choices=["resnet18", "mobilenet_v2"], help="Model to use in distill and quantize")
     args = parser.parse_args()
 
