@@ -2,4 +2,4 @@ __pycache__/
 .venv/
 dataset_checkpoint/
 generator_checkpoints/
-test/
+test.py
