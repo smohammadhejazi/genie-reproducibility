@@ -3,6 +3,7 @@ import copy
 import logging
 import torch
 import os
+import gc
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -125,8 +126,11 @@ def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
     if load_checkpoint and checkpoint_path and os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
         generator.load_state_dict(checkpoint['generator_state_dict'])
+        z = checkpoint['z'].to('cuda')
         opt_z.load_state_dict(checkpoint['opt_z_state_dict'])
         opt_g.load_state_dict(checkpoint['opt_g_state_dict'])
+        scheduler_z.load_state_dict(checkpoint['scheduler_z_state_dict'])
+        scheduler_g.load_state_dict(checkpoint['scheduler_g_state_dict'])
         start_iteration = checkpoint['iteration'] + 1
         log.info(f"Loaded generator checkpoint from {checkpoint_path}, resuming at iteration {start_iteration}")
 
@@ -148,21 +152,37 @@ def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
         opt_z.step()
         opt_g.step()
         scheduler_z.step(total_loss.item())
-
         if (iteration + 1) % 100 == 0:
             log.info(f'{iteration + 1}/{iters}, Loss: {total_loss:.3f}, Mean: {mean_loss:.3f}, Std: {std_loss:.3f}')
             scheduler_g.step()
             safe_save({
                 'generator_state_dict': generator.state_dict(),
+                'z': z.detach().cpu(),
                 'opt_z_state_dict': opt_z.state_dict(),
                 'opt_g_state_dict': opt_g.state_dict(),
+                'scheduler_z_state_dict': scheduler_z.state_dict(),
+                'scheduler_g_state_dict': scheduler_g.state_dict(),
                 'iteration': iteration,
             }, checkpoint_path)
             log.info(f"Generator checkpoint saved at iteration {iteration + 1} to {checkpoint_path}")
 
+        if total_loss.item() < 0.040:
+            log.info(f'{iteration + 1}/{iters}, Loss: {total_loss:.3f}, Mean: {mean_loss:.3f}, Std: {std_loss:.3f}')
+            safe_save({
+                'generator_state_dict': generator.state_dict(),
+                'z': z.detach().cpu(),
+                'opt_z_state_dict': opt_z.state_dict(),
+                'opt_g_state_dict': opt_g.state_dict(),
+                'scheduler_z_state_dict': scheduler_z.state_dict(),
+                'scheduler_g_state_dict': scheduler_g.state_dict(),
+                'iteration': iteration,
+            }, checkpoint_path)
+            log.info(f"Generator checkpoint saved at iteration {iteration + 1} to {checkpoint_path}")
+            break
+
     return x
 
-def distill_data(model, load_dataset_checkpoint=False, dataset_checkpoint_filename='dataset_checkpoint.pt'):
+def distill_data(model, load_dataset_checkpoint=True, dataset_checkpoint_filename='dataset_checkpoint.pt'):
     model = copy.deepcopy(model).cuda().eval()
     dataset = []
     hooks = []
@@ -206,16 +226,24 @@ def distill_data(model, load_dataset_checkpoint=False, dataset_checkpoint_filena
 
         # Optionally load generator checkpoint if available.
         x = train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
-                            hooks, bn_stats, generator_checkpoint_path, load_checkpoint=False)
+                            hooks, bn_stats, generator_checkpoint_path, load_checkpoint=True)
         
-        dataset.append(x.detach().clone())
+        dataset.append(x.detach().cpu().clone())
 
         # Save dataset checkpoint after each batch; update current_index accordingly.
         safe_save({
             'dataset': dataset,
             'current_index': i + 1,
         }, dataset_checkpoint_path)
-        log.info(f"Dataset checkpoint saved at index {i + 1} to {dataset_checkpoint_path}")
+        safe_save({
+            'dataset': dataset,
+            'current_index': i + 1,
+        }, dataset_checkpoint_path.replace('.pt', f'_{i}.pt'))
+        log.info(f"Dataset checkpoint saved at index {i} to {dataset_checkpoint_path}")
+
+        gc.collect()
+        torch.cuda.empty_cache()
+        log.info("Cleared CPU, GPU, and Python caches.")
 
     # Remove hooks after processing.
     for hook in hooks:
