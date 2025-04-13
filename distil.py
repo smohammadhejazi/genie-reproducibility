@@ -152,16 +152,12 @@ def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
         if (iteration + 1) % 100 == 0:
             log.info(f'{iteration + 1}/{iters}, Loss: {total_loss:.3f}, Mean: {mean_loss:.3f}, Std: {std_loss:.3f}')
             scheduler_g.step()
-
-        # Save generator checkpoint every 2 iterations
-        if (iteration + 1) % 2 == 0 and checkpoint_path:
             safe_save({
                 'generator_state_dict': generator.state_dict(),
                 'opt_z_state_dict': opt_z.state_dict(),
                 'opt_g_state_dict': opt_g.state_dict(),
                 'iteration': iteration,
             }, checkpoint_path)
-
             log.info(f"Generator checkpoint saved at iteration {iteration + 1} to {checkpoint_path}")
 
     return x
@@ -210,7 +206,7 @@ def distill_data(model, load_dataset_checkpoint=False, dataset_checkpoint_filena
 
         # Optionally load generator checkpoint if available.
         x = train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
-                            hooks, bn_stats, generator_checkpoint_path, load_checkpoint=True)
+                            hooks, bn_stats, generator_checkpoint_path, load_checkpoint=False)
         
         dataset.append(x.detach().clone())
 
@@ -226,4 +222,8 @@ def distill_data(model, load_dataset_checkpoint=False, dataset_checkpoint_filena
         hook.remove()
 
     dataset = torch.cat(dataset)
+    safe_save({
+        'dataset': dataset,
+    }, dataset_checkpoint_path.replace('.pt', '_final.pt'))
+    log.info(f"Final full dataset checkpoint saved.")
     return dataset
