@@ -107,10 +107,7 @@ def initialize_generator():
 def loss_function(A, B):
     return F.mse_loss(A, B, reduction='sum') / B.size(0)
 
-def compute_loss(x, bn_stats, hooks):
-    input_mean = torch.zeros(batch_size, 3, device='cuda')
-    input_std = torch.ones(batch_size, 3, device='cuda')
-
+def compute_loss(x, bn_stats, hooks, input_mean, input_std):
     data_std, data_mean = torch.std_mean(x, dim=[2, 3])
     mean_loss = loss_function(input_mean, data_mean)
     std_loss = loss_function(input_std, data_std)
@@ -123,7 +120,7 @@ def compute_loss(x, bn_stats, hooks):
 
     return mean_loss, std_loss
 
-def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g, hooks, bn_stats, checkpoint_path, load_checkpoint=False, iters=1000):
+def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g, hooks, bn_stats, checkpoint_path, load_checkpoint=False):
     start_iteration = 0
     if load_checkpoint and checkpoint_path and os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
@@ -133,6 +130,9 @@ def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
         start_iteration = checkpoint['iteration'] + 1
         log.info(f"Loaded generator checkpoint from {checkpoint_path}, resuming at iteration {start_iteration}")
 
+    input_mean = torch.zeros(batch_size, 3, device='cuda')
+    input_std = torch.ones(batch_size, 3, device='cuda')
+
     for iteration in range(start_iteration, iters):
         model.zero_grad()
         opt_z.zero_grad()
@@ -141,7 +141,7 @@ def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
         x = generator(z)
         model(x)
 
-        mean_loss, std_loss = compute_loss(x, bn_stats, hooks)
+        mean_loss, std_loss = compute_loss(x, bn_stats, hooks, input_mean, input_std)
         total_loss = mean_loss + std_loss
 
         total_loss.backward()
