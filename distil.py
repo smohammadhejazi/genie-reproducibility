@@ -166,7 +166,7 @@ def train_generator(model, generator, z, opt_z, opt_g, scheduler_z, scheduler_g,
             }, checkpoint_path)
             log.info(f"Generator checkpoint saved at iteration {iteration + 1} to {checkpoint_path}")
 
-        if total_loss.item() < 0.040:
+        if total_loss.item() <= 0.039:
             log.info(f'{iteration + 1}/{iters}, Loss: {total_loss:.3f}, Mean: {mean_loss:.3f}, Std: {std_loss:.3f}')
             safe_save({
                 'generator_state_dict': generator.state_dict(),
