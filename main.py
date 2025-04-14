@@ -4,7 +4,7 @@ import torchvision.models as models
 from torchvision.models import ResNet18_Weights, MobileNet_V2_Weights
 from distil import distill_data
 from quantize import quantize_model
-# from quantize import reconstruct
+from quantize import reconstruct
 from evaluation import evaluate
 
 
@@ -16,6 +16,8 @@ def main():
     parser = argparse.ArgumentParser(prog=prog, description=descr)
     parser.add_argument("-d", "--distill", action="store_true", help="Distill images")
     parser.add_argument("-q", "--quantize", action="store_true", help="Quantize model")
+    parser.add_argument("-r", "--reconstruct", action="store_true", help="Quantize model")
+    parser.add_argument("-e", "--evaluate", action="store_true", help="Evaluate model")
     parser.add_argument("model", choices=["resnet18", "mobilenet_v2"], help="Model to use in distill and quantize")
     args = parser.parse_args()
 
@@ -28,11 +30,10 @@ def main():
         train_dataset = distill_data(model)
     if args.quantize:
         quantized_model = quantize_model(model)
-    # if args.reconstruct:
-    #     reconstruct(quantize_model, model, train_dataset)
+    if args.reconstruct:
+        reconstruct(model, quantize_model, train_dataset)
     if args.evaluate:
         evaluate(quantized_model)
-
 
 
 if __name__ == "__main__":
