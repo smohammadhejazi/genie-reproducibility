@@ -206,7 +206,7 @@ def distill_data(model, load_dataset_checkpoint=True, dataset_checkpoint_filenam
     # Check if we need to load an existing dataset checkpoint.
     current_index = 0
     if load_dataset_checkpoint and os.path.exists(dataset_checkpoint_path):
-        checkpoint_data = torch.load(dataset_checkpoint_path)
+        checkpoint_data = torch.load(dataset_checkpoint_path, map_location='cpu')
         dataset = checkpoint_data['dataset']
         current_index = checkpoint_data['current_index']
         log.info(f"Loaded dataset checkpoint from {dataset_checkpoint_path} with current index {current_index}")
@@ -235,10 +235,6 @@ def distill_data(model, load_dataset_checkpoint=True, dataset_checkpoint_filenam
             'dataset': dataset,
             'current_index': i + 1,
         }, dataset_checkpoint_path)
-        safe_save({
-            'dataset': dataset,
-            'current_index': i + 1,
-        }, dataset_checkpoint_path.replace('.pt', f'_{i}.pt'))
         log.info(f"Dataset checkpoint saved at index {i} to {dataset_checkpoint_path}")
 
         gc.collect()
