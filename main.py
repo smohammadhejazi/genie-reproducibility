@@ -3,8 +3,7 @@ import argparse
 import torchvision.models as models
 from torchvision.models import ResNet18_Weights, MobileNet_V2_Weights
 from distil import distill_data
-from quantize import quantize_model
-from quantize import reconstruct
+from reconstruct import quantize_model, reconstruct
 from evaluation import evaluate
 
 
@@ -31,7 +30,7 @@ def main():
     if args.quantize:
         quantized_model = quantize_model(model)
     if args.reconstruct:
-        reconstruct(model, quantize_model, train_dataset)
+        reconstruct(model, quantized_model, train_dataset)
     if args.evaluate:
         evaluate(quantized_model)
 
