@@ -4,3 +4,4 @@ dataset_checkpoint/
 generator_checkpoints/
 imagenet_val/
 test.py
+saved_models/
