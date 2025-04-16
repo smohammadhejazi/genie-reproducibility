@@ -3,7 +3,6 @@ from torchvision import models, datasets, transforms
 from torch.utils.data import DataLoader
 from torchvision.models import ResNet18_Weights
 from torch.utils.data import Subset
-from reconstruct import QuantizableLayer
 
 def evaluate(model, dataset, batch_size=64, workers=4):
     model.eval()  # Set the model to evaluation mode
