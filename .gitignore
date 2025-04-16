@@ -3,5 +3,7 @@ __pycache__/
 dataset_checkpoint/
 generator_checkpoints/
 imagenet_val/
-test.py
+test*.py
 saved_models/
+images/
+dog_images/
