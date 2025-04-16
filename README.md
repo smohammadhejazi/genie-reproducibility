@@ -16,6 +16,9 @@ pip3 install -r requirements.txt
 # Generating dataset using using ResNet18
 python3 main.py --model_name=resnet18 -d
 
+# Run a 512 samples evaluation on models (first you need to setup ILSVRC12 and organize each class in its respective labeled folder)
+python3 main.py --model_name=resnet18 -d
+
 ```
 Detailed descriptions of arguments are provided in [main.py](main.py).
 
