@@ -9,7 +9,7 @@ from evaluation import evaluate
 
 def main():
     # Simulate command-line arguments for testing/debugging
-    sys.argv = ["main.py", "resnet18", "-d"]
+    # sys.argv = ["main.py", "resnet18", "-d"]
     
     # Set program name and description for argument parser
     prog = "Genie Reproducibility Challenge"
@@ -41,16 +41,18 @@ def main():
         train_dataset = distill_data(model)
 
     # Perform model quantization if requested
-    if args.quantize:
-        quantized_model = quantize_model(model)
+    # Done in the jupyter notebook python file reconstruction.ipynb
+    # if args.quantize:
+    #     quantized_model = quantize_model(model)
 
     # Perform reconstruction using the distilled dataset and quantized model if requested
-    if args.reconstruct:
-        reconstruct(model, quantized_model, train_dataset)
+    # Done in the jupyter notebook python file reconstruction.ipynb
+    # if args.reconstruct:
+    #     reconstruct(model, quantized_model, train_dataset)
 
     # Evaluate the quantized model if requested
     if args.evaluate:
-        evaluate(quantized_model)
+        evaluate(model)
 
 # Execute the main function when the script is run directly
 if __name__ == "__main__":
